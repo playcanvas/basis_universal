@@ -78,6 +78,8 @@ set(BASISU_SRC_LIST ${COMMON_SRC_LIST}
 
 if (APPLE)
    set(BIN_DIRECTORY "bin_osx")
+elseif (EMSCRIPTEN)
+	set(BIN_DIRECTORY "bin_wasm")
 else()
    set(BIN_DIRECTORY "bin")
 endif()
