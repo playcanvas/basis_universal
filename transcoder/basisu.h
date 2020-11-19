@@ -66,6 +66,7 @@
 #include <vector>
 #include <assert.h>
 #include <random>
+#include <cstddef>
 
 #ifdef max
 #undef max
