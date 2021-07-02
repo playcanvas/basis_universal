@@ -37,10 +37,6 @@ if (EMSCRIPTEN)
   	  set(ZSTD_DEFINITION BASISD_SUPPORT_KTX2_ZSTD=0)
     endif()
   
-    #  message("KTX2_DEFINITION=${KTX2_DEFINITION})
-    #  message("ZSTD_DEFINITION=${ZSTD_DEFINITION})
-
-    add_executable(basis_transcoder.js ${SRC_LIST})
     add_executable(${name}.js ${SRC_LIST})
 
     set(allTypes UASTC ASTC ATC BC7 DXT1 DXT5A ETC2_EAC_A8 ETC2_EAC_RG11 FXT1 PVRTC1 PVRTC2)
@@ -55,7 +51,7 @@ if (EMSCRIPTEN)
       endif()
     endforeach()
 
-    target_compile_definitions(${name}.js PRIVATE NDEBUG ${typeList})
+    target_compile_definitions(${name}.js PRIVATE NDEBUG ${typeList} ${KTX2_DEFINITION} ${ZSTD_DEFINITION})
     target_compile_options(${name}.js PRIVATE -O3 -fno-strict-aliasing)
     target_include_directories(${name}.js PRIVATE ../../transcoder)
 
