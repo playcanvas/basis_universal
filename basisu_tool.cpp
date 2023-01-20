@@ -1605,22 +1605,18 @@ static bool unpack_and_validate_ktx2_file(
 					gpu_image& gi = gpu_images[(int)transcoder_tex_fmt][face_index][layer_index][level_index];
 					gi.init(tex_fmt, level_info.m_orig_width, level_info.m_orig_height);
 
-					// skip transcode if we're unpacking rgba only
-					// if (!opts.m_unpack_rgba_only && (opts.m_unpack_level < 0 || level_index == (uint32_t) opts.m_unpack_level))
+					// Fill the buffer with psuedo-random bytes, to help more visibly detect cases where the transcoder fails to write to part of the output.
+					fill_buffer_with_random_bytes(gi.get_ptr(), gi.get_size_in_bytes());
+
+					uint32_t decode_flags = 0;
+
+					if (!dec.transcode_image_level(level_index, layer_index, face_index, gi.get_ptr(), gi.get_total_blocks(), transcoder_tex_fmt, decode_flags))
 					{
-						// Fill the buffer with psuedo-random bytes, to help more visibly detect cases where the transcoder fails to write to part of the output.
-						fill_buffer_with_random_bytes(gi.get_ptr(), gi.get_size_in_bytes());
-
-						uint32_t decode_flags = 0;
-
-						if (!dec.transcode_image_level(level_index, layer_index, face_index, gi.get_ptr(), gi.get_total_blocks(), transcoder_tex_fmt, decode_flags))
-						{
-							error_printf("Failed transcoding image level (%u %u %u %u)!\n", layer_index, level_index, face_index, format_iter);
-							return false;
-						}
-
-						printf("Transcode of layer %u level %u face %u res %ux%u format %s succeeded\n", layer_index, level_index, face_index, level_info.m_orig_width, level_info.m_orig_height, basist::basis_get_format_name(transcoder_tex_fmt));
+						error_printf("Failed transcoding image level (%u %u %u %u)!\n", layer_index, level_index, face_index, format_iter);
+						return false;
 					}
+
+					printf("Transcode of layer %u level %u face %u res %ux%u format %s succeeded\n", layer_index, level_index, face_index, level_info.m_orig_width, level_info.m_orig_height, basist::basis_get_format_name(transcoder_tex_fmt));
 				}
 
 			} // format_iter
