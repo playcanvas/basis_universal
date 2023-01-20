@@ -287,6 +287,8 @@ public:
 		m_individual(true),
 		m_no_ktx(false),
 		m_ktx_only(false),
+		m_unpack_level(-1),
+		m_unpack_rgba_only(false),
 		m_write_out(false),
 		m_format_only(-1),
 		m_etc1_only(false),
@@ -616,6 +618,14 @@ public:
 				m_no_ktx = true;
 			else if (strcasecmp(pArg, "-ktx_only") == 0)
 				m_ktx_only = true;
+			else if (strcasecmp(pArg, "-unpack_level") == 0)
+			{
+				REMAINING_ARGS_CHECK(1);
+				m_unpack_level = atoi(arg_v[arg_index + 1]);
+				arg_count++;
+			}
+			else if (strcasecmp(pArg, "-unpack_rgba_only") == 0)
+				m_unpack_rgba_only = true;
 			else if (strcasecmp(pArg, "-write_out") == 0)
 				m_write_out = true;
 			else if (strcasecmp(pArg, "-format_only") == 0)
@@ -860,6 +870,8 @@ public:
 	bool m_individual;
 	bool m_no_ktx;
 	bool m_ktx_only;
+	int m_unpack_level;
+	bool m_unpack_rgba_only;
 	bool m_write_out;
 	bool m_etc1_only;
 	bool m_fuzz_testing;
@@ -1617,12 +1629,13 @@ static bool unpack_and_validate_ktx2_file(
 	{
 		// Now write KTX files and unpack them to individual PNG's
 		const bool is_cubemap_array = (dec.get_faces() > 1) && (total_layers > 1);
+		const basist::transcoder_texture_format internal_format = is_etc1s ? basist::transcoder_texture_format::cTFETC2_RGBA : basist::transcoder_texture_format::cTFASTC_4x4_RGBA;
 
 		for (int format_iter = first_format; format_iter < last_format; format_iter++)
 		{
 			const basist::transcoder_texture_format transcoder_tex_fmt = static_cast<basist::transcoder_texture_format>(format_iter);
 
-			if (basist::basis_transcoder_format_is_uncompressed(transcoder_tex_fmt))
+			if ((opts.m_unpack_rgba_only && transcoder_tex_fmt != internal_format) || basist::basis_transcoder_format_is_uncompressed(transcoder_tex_fmt))
 				continue;
 			if (!basis_is_format_supported(transcoder_tex_fmt, dec.get_format()))
 				continue;
@@ -1679,6 +1692,9 @@ static bool unpack_and_validate_ktx2_file(
 
 					for (uint32_t level_index = 0; level_index < gi.size(); level_index++)
 					{
+						if (opts.m_unpack_level >= 0 && level_index != (uint32_t) opts.m_unpack_level)
+							continue;
+
 						basist::ktx2_image_level_info level_info;
 
 						if (!dec.get_image_level_info(level_info, level_index, layer_index, face_index))
@@ -1702,62 +1718,79 @@ static bool unpack_and_validate_ktx2_file(
 							write_png = false;
 #endif
 
-						if ((!opts.m_ktx_only) && (write_png))
+						if (opts.m_unpack_rgba_only)
 						{
-							std::string rgb_filename;
-							if (gi.size() > 1)
-								rgb_filename = base_filename + string_format("_unpacked_rgb_%s_%u_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
-							else
-								rgb_filename = base_filename + string_format("_unpacked_rgb_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
-							if (!save_png(rgb_filename, u, cImageSaveIgnoreAlpha))
-							{
-								error_printf("Failed writing to PNG file \"%s\"\n", rgb_filename.c_str());
-								delete pGlobal_codebook_data; pGlobal_codebook_data = nullptr;
-								return false;
-							}
-							printf("Wrote PNG file \"%s\"\n", rgb_filename.c_str());
-						}
-
-						if ((transcoder_tex_fmt == basist::transcoder_texture_format::cTFFXT1_RGB) && (opts.m_write_out))
-						{
-							std::string out_filename;
-							if (gi.size() > 1)
-								out_filename = base_filename + string_format("_unpacked_rgb_%s_%u_%u_%04u.out", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
-							else
-								out_filename = base_filename + string_format("_unpacked_rgb_%s_%u_%04u.out", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
-							if (!write_3dfx_out_file(out_filename.c_str(), gi[level_index]))
-							{
-								error_printf("Failed writing to OUT file \"%s\"\n", out_filename.c_str());
-								return false;
-							}
-							printf("Wrote .OUT file \"%s\"\n", out_filename.c_str());
-						}
-
-						if (basis_transcoder_format_has_alpha(transcoder_tex_fmt) && (!opts.m_ktx_only) && (write_png))
-						{
-							std::string a_filename;
-							if (gi.size() > 1)
-								a_filename = base_filename + string_format("_unpacked_a_%s_%u_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
-							else
-								a_filename = base_filename + string_format("_unpacked_a_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
-							if (!save_png(a_filename, u, cImageSaveGrayscale, 3))
-							{
-								error_printf("Failed writing to PNG file \"%s\"\n", a_filename.c_str());
-								return false;
-							}
-							printf("Wrote PNG file \"%s\"\n", a_filename.c_str());
-
 							std::string rgba_filename;
 							if (gi.size() > 1)
-								rgba_filename = base_filename + string_format("_unpacked_rgba_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
+								rgba_filename = base_filename + string_format("_unpacked_rgba_%u_%u_%04u.png", level_index, face_index, layer_index);
 							else
-								rgba_filename = base_filename + string_format("_unpacked_rgba_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
+								rgba_filename = base_filename + string_format("_unpacked_rgba_%u_%04u.png", face_index, layer_index);
 							if (!save_png(rgba_filename, u))
 							{
 								error_printf("Failed writing to PNG file \"%s\"\n", rgba_filename.c_str());
 								return false;
 							}
 							printf("Wrote PNG file \"%s\"\n", rgba_filename.c_str());
+						}
+						else
+						{
+							if ((!opts.m_ktx_only) && (write_png))
+							{
+								std::string rgb_filename;
+								if (gi.size() > 1)
+									rgb_filename = base_filename + string_format("_unpacked_rgb_%s_%u_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
+								else
+									rgb_filename = base_filename + string_format("_unpacked_rgb_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
+								if (!save_png(rgb_filename, u, cImageSaveIgnoreAlpha))
+								{
+									error_printf("Failed writing to PNG file \"%s\"\n", rgb_filename.c_str());
+									delete pGlobal_codebook_data; pGlobal_codebook_data = nullptr;
+									return false;
+								}
+								printf("Wrote PNG file \"%s\"\n", rgb_filename.c_str());
+							}
+
+							if ((transcoder_tex_fmt == basist::transcoder_texture_format::cTFFXT1_RGB) && (opts.m_write_out))
+							{
+								std::string out_filename;
+								if (gi.size() > 1)
+									out_filename = base_filename + string_format("_unpacked_rgb_%s_%u_%u_%04u.out", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
+								else
+									out_filename = base_filename + string_format("_unpacked_rgb_%s_%u_%04u.out", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
+								if (!write_3dfx_out_file(out_filename.c_str(), gi[level_index]))
+								{
+									error_printf("Failed writing to OUT file \"%s\"\n", out_filename.c_str());
+									return false;
+								}
+								printf("Wrote .OUT file \"%s\"\n", out_filename.c_str());
+							}
+
+							if (basis_transcoder_format_has_alpha(transcoder_tex_fmt) && (!opts.m_ktx_only) && (write_png))
+							{
+								std::string a_filename;
+								if (gi.size() > 1)
+									a_filename = base_filename + string_format("_unpacked_a_%s_%u_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
+								else
+									a_filename = base_filename + string_format("_unpacked_a_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
+								if (!save_png(a_filename, u, cImageSaveGrayscale, 3))
+								{
+									error_printf("Failed writing to PNG file \"%s\"\n", a_filename.c_str());
+									return false;
+								}
+								printf("Wrote PNG file \"%s\"\n", a_filename.c_str());
+
+								std::string rgba_filename;
+								if (gi.size() > 1)
+									rgba_filename = base_filename + string_format("_unpacked_rgba_%s_%u_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
+								else
+									rgba_filename = base_filename + string_format("_unpacked_rgba_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
+								if (!save_png(rgba_filename, u))
+								{
+									error_printf("Failed writing to PNG file \"%s\"\n", rgba_filename.c_str());
+									return false;
+								}
+								printf("Wrote PNG file \"%s\"\n", rgba_filename.c_str());
+							}
 						}
 
 					} // level_index
