@@ -1629,13 +1629,13 @@ static bool unpack_and_validate_ktx2_file(
 	{
 		// Now write KTX files and unpack them to individual PNG's
 		const bool is_cubemap_array = (dec.get_faces() > 1) && (total_layers > 1);
+		const basist::transcoder_texture_format internal_format = is_etc1s ? basist::transcoder_texture_format::cTFETC2_RGBA : basist::transcoder_texture_format::cTFASTC_4x4_RGBA;
 
 		for (int format_iter = first_format; format_iter < last_format; format_iter++)
 		{
 			const basist::transcoder_texture_format transcoder_tex_fmt = static_cast<basist::transcoder_texture_format>(format_iter);
 
-			if ((opts.m_unpack_rgba_only && transcoder_tex_fmt != basist::transcoder_texture_format::cTFETC2_RGBA) ||
-				basist::basis_transcoder_format_is_uncompressed(transcoder_tex_fmt))
+			if ((opts.m_unpack_rgba_only && transcoder_tex_fmt != internal_format) || basist::basis_transcoder_format_is_uncompressed(transcoder_tex_fmt))
 				continue;
 			if (!basis_is_format_supported(transcoder_tex_fmt, dec.get_format()))
 				continue;
@@ -1722,9 +1722,9 @@ static bool unpack_and_validate_ktx2_file(
 						{
 							std::string rgba_filename;
 							if (gi.size() > 1)
-								rgba_filename = base_filename + string_format("_unpacked_rgba_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
+								rgba_filename = base_filename + string_format("_unpacked_rgba_%u_%u_%04u.png", level_index, face_index, layer_index);
 							else
-								rgba_filename = base_filename + string_format("_unpacked_rgba_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
+								rgba_filename = base_filename + string_format("_unpacked_rgba_%u_%04u.png", face_index, layer_index);
 							if (!save_png(rgba_filename, u))
 							{
 								error_printf("Failed writing to PNG file \"%s\"\n", rgba_filename.c_str());
@@ -1781,7 +1781,7 @@ static bool unpack_and_validate_ktx2_file(
 
 								std::string rgba_filename;
 								if (gi.size() > 1)
-									rgba_filename = base_filename + string_format("_unpacked_rgba_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
+									rgba_filename = base_filename + string_format("_unpacked_rgba_%s_%u_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), level_index, face_index, layer_index);
 								else
 									rgba_filename = base_filename + string_format("_unpacked_rgba_%s_%u_%04u.png", basist::basis_get_format_name(transcoder_tex_fmt), face_index, layer_index);
 								if (!save_png(rgba_filename, u))
