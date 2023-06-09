@@ -187,6 +187,8 @@ namespace basisu
 			opencl_init(opencl_force_serialization);
 		}
 
+		interval_timer::init(); // make sure interval_timer globals are initialized from main thread to avoid TSAN reports
+
 		g_library_initialized = true;
 	}
 
@@ -227,7 +229,7 @@ namespace basisu
 	{
 		QueryPerformanceFrequency(reinterpret_cast<LARGE_INTEGER*>(pTicks));
 	}
-#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__)
+#elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__EMSCRIPTEN__)
 #include <sys/time.h>
 	inline void query_counter(timer_ticks* pTicks)
 	{
@@ -1310,11 +1312,13 @@ namespace basisu
 
 		uint32_t a = max_index / num_syms, b = max_index % num_syms;
 
+		const uint32_t ofs = m_entries_picked.size();
+
 		m_entries_picked.push_back(a);
 		m_entries_picked.push_back(b);
 
 		for (uint32_t i = 0; i < num_syms; i++)
-			if ((i != b) && (i != a))
+			if ((i != m_entries_picked[ofs + 1]) && (i != m_entries_picked[ofs]))
 				m_entries_to_do.push_back(i);
 
 		for (uint32_t i = 0; i < m_entries_to_do.size(); i++)
