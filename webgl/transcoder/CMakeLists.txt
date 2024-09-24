@@ -15,52 +15,56 @@ message("KTX2_ZSTANDARD=${KTX2_ZSTANDARD}")
 
 if (EMSCRIPTEN)
   set(CMAKE_CXX_STANDARD 11)
-  
-  set(SRC_LIST
-  	../../transcoder/basisu_transcoder.cpp
-	basis_wrappers.cpp
-  )
-  
-  if (KTX2)
-	set(KTX2_DEFINITION BASISD_SUPPORT_KTX2=1)
-  else()
-  	set(KTX2_DEFINITION BASISD_SUPPORT_KTX2=0)
-  endif()
-  
-  if (KTX2_ZSTANDARD)
- 	set(SRC_LIST ${SRC_LIST}
-		../../zstd/zstddeclib.c
-	)
-	set(ZSTD_DEFINITION BASISD_SUPPORT_KTX2_ZSTD=1)
-  else()
-  	set(ZSTD_DEFINITION BASISD_SUPPORT_KTX2_ZSTD=0)
-  endif()
-  
-#  message("KTX2_DEFINITION=${KTX2_DEFINITION})
-#  message("ZSTD_DEFINITION=${ZSTD_DEFINITION})
 
-  add_executable(basis_transcoder.js ${SRC_LIST})
-
-  target_compile_definitions(basis_transcoder.js PRIVATE NDEBUG 
-  	BASISD_SUPPORT_UASTC_HDR=1 
-	BASISD_SUPPORT_UASTC=1 
-	BASISD_SUPPORT_BC7=1 
-	BASISD_SUPPORT_ATC=0 
-	BASISD_SUPPORT_ASTC_HIGHER_OPAQUE_QUALITY=0 
-	BASISD_SUPPORT_PVRTC2=0 
-	BASISD_SUPPORT_FXT1=0 
-	BASISD_SUPPORT_ETC2_EAC_RG11=0 
-	BASISU_SUPPORT_ENCODING=0 
-	BASISD_ENABLE_DEBUG_FLAGS=1
-	${KTX2_DEFINITION} 
-	${ZSTD_DEFINITION} 
-  )
+  function(build_target name flags enabled)
+    set(SRC_LIST
+  	  ../../transcoder/basisu_transcoder.cpp
+	    basis_wrappers.cpp
+    )
   
-  target_compile_options(basis_transcoder.js PRIVATE -O3 -fno-strict-aliasing)
-  target_include_directories(basis_transcoder.js PRIVATE ../../transcoder)
+    if (KTX2)
+	    set(KTX2_DEFINITION BASISD_SUPPORT_KTX2=1)
+    else()
+  	  set(KTX2_DEFINITION BASISD_SUPPORT_KTX2=0)
+    endif()
+  
+    if (KTX2_ZSTANDARD)
+ 	    set(SRC_LIST ${SRC_LIST}
+		    ../../zstd/zstddeclib.c
+	    )
+	    set(ZSTD_DEFINITION BASISD_SUPPORT_KTX2_ZSTD=1)
+    else()
+  	  set(ZSTD_DEFINITION BASISD_SUPPORT_KTX2_ZSTD=0)
+    endif()
+  
+    add_executable(${name}.js ${SRC_LIST})
 
-  set_target_properties(basis_transcoder.js PROPERTIES
-      OUTPUT_NAME "basis_transcoder"
-      SUFFIX ".js"
-      LINK_FLAGS "--bind -s ALLOW_MEMORY_GROWTH=1 -O3 -s ASSERTIONS=0 -s MALLOC=emmalloc -s MODULARIZE=1 -s EXPORT_NAME=BASIS ")
+    set(allTypes UASTC_HDR UASTC ASTC ATC BC7 DXT1 DXT5A ETC2_EAC_A8 ETC2_EAC_RG11 FXT1 PVRTC1 PVRTC2)
+    set(typeList "")
+
+    foreach(type ${allTypes})
+      string(FIND ${enabled} ${type} found)
+      if(${found} EQUAL -1)
+        list(APPEND typeList "BASISD_SUPPORT_${type}=0")
+      else()
+        list(APPEND typeList "BASISD_SUPPORT_${type}=1")
+      endif()
+    endforeach()
+
+    target_compile_definitions(${name}.js PRIVATE NDEBUG ${typeList} ${KTX2_DEFINITION} ${ZSTD_DEFINITION})
+    target_compile_options(${name}.js PRIVATE -O3 -fno-strict-aliasing)
+    target_include_directories(${name}.js PRIVATE ../../transcoder)
+
+    set_target_properties(${name}.js PROPERTIES
+        OUTPUT_NAME "${name}"
+        SUFFIX ".js"
+        LINK_FLAGS "${flags} --bind -s ALLOW_MEMORY_GROWTH=1 -O3 -s ASSERTIONS=0 -s MALLOC=emmalloc -s MODULARIZE=1 -s EXPORT_NAME=BASIS")
+  endfunction()
+
+  function(build name enabled)
+    build_target("${name}.wasm" "-s WASM=1" ${enabled})
+    build_target("${name}" "-s WASM=0 -s SINGLE_FILE=1" ${enabled})
+  endFunction()
+
+  build("basis" "UASTC_HDR|UASTC|ASTC|DXT1|DXT5A|ETC2_EAC_A8|ETC2_EAC_RG11")
 endif()
